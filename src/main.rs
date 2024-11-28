@@ -1,8 +1,10 @@
-mod tcp_server;
-use log::error;
+mod modules;
+use modules::http_server::HttpServer;
+use modules::tcp_server;
+use modules::traits;
+use modules::traits::Server;
 
 fn main() {
-    let tcp_server = tcp_server::server::TcpServer::new("127.0.0.1", "8000");
-
-    tcp_server::server::TcpServer::serve(tcp_server).unwrap_or_else(|e| error!("{}", e))
+    let server = HttpServer::new("0.0.0.0", 8000);
+    server.start();
 }
