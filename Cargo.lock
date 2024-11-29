@@ -94,6 +94,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "field_accessor"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3195c523ad3b7d432417718f9eeca0d1ba78e7dfc0e3ee1728b08787cc1cd778"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "gimli"
 version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -114,6 +124,7 @@ version = "0.1.0"
 dependencies = [
  "env_logger",
  "failure",
+ "field_accessor",
  "log",
 ]
 
