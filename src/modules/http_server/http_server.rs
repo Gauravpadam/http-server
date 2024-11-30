@@ -19,8 +19,8 @@ pub struct HttpServer {
 impl HttpServer {
     pub fn new(host: &str, port: u16) -> Self {
         let mut headers = HashMap::new();
-        headers.insert("Server:".to_string(), "Crude Server".to_string());
-        headers.insert("Content-Type:".to_string(), "text/html".to_string());
+        headers.insert("Server".to_string(), "Crude Server".to_string());
+        headers.insert("Content-Type".to_string(), "text/html".to_string());
 
         Self {
             server: TcpServer::new(host, port),
@@ -93,13 +93,17 @@ impl HttpServer {
             }
         };
 
-        format!(
+        let response = format!(
             "{}\r\n{}\r\n{}{}",
             response_line,
             response_headers.join("\r\n"),
             blank_line,
             response_body
-        )
+        );
+
+        println!("Response in {}", response);
+
+        response
     }
 
     pub fn http_501_handler(&self, request: HttpRequest) -> String {
@@ -137,6 +141,8 @@ impl Server for HttpServer {
             }
             _ => response = self.http_501_handler(request),
         }
+
+        print!("{}", response);
 
         response.as_bytes().to_vec()
 
