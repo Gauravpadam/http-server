@@ -1,8 +1,11 @@
 use crate::modules::http_request::HttpRequest;
+use crate::modules::utils::utils;
 use crate::tcp_server::TcpServer;
 use crate::traits::Server;
+use http_types::Mime;
 use std::collections::HashMap;
 use std::fs::File;
+use std::hash::RandomState;
 use std::path::Path;
 use std::sync::Arc;
 use std::{
@@ -52,6 +55,14 @@ impl HttpServer {
         headers
     }
 
+    pub fn get_headers_for_request(&self, mime: Option<Mime>) -> Option<HashMap<String, String>> {
+        if let Some(mimetype) = mime {
+            utils::mimetype_to_hashmap(mimetype.essence())
+        } else {
+            None
+        }
+    }
+
     pub fn handle_get(&self, request: HttpRequest) -> String {
         let filename = request
             .uri
@@ -59,6 +70,11 @@ impl HttpServer {
             .strip_prefix("/")
             .unwrap_or("")
             .to_owned();
+        let extension = filename.strip_prefix(".").unwrap_or("html");
+        println!("{}", extension);
+        let mime = Mime::from_extension(extension).to_owned();
+        let extra_headers = self.get_headers_for_request(mime);
+        println!("{:?}", extra_headers);
         let path = Path::new("static_assets").join(filename);
         let display = path.display();
         let mut response_line = String::new();
@@ -80,7 +96,7 @@ impl HttpServer {
             Ok(mut file) => {
                 response_line = self.response_line(200).to_string();
                 response_headers = self
-                    .response_headers(None)
+                    .response_headers(extra_headers)
                     .into_iter()
                     .map(|(key, value)| format!("{}:{}", key, value))
                     .collect();
@@ -100,8 +116,6 @@ impl HttpServer {
             blank_line,
             response_body
         );
-
-        println!("Response in {}", response);
 
         response
     }

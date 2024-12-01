@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+http-types = "2.12.0"
+failure = "0.1.5"
 log = "0.4"
 env_logger = "0.6.1"
 field_accessor = "0.5.2"
-failure = "0.1.5"
