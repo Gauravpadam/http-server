@@ -1,11 +1,10 @@
 use crate::modules::http_request::HttpRequest;
+use crate::modules::mime::Mime;
 use crate::modules::utils::utils;
 use crate::tcp_server::TcpServer;
 use crate::traits::Server;
-use http_types::Mime;
 use std::collections::HashMap;
 use std::fs::File;
-use std::hash::RandomState;
 use std::path::Path;
 use std::sync::Arc;
 use std::{
@@ -47,20 +46,15 @@ impl HttpServer {
         let mut headers = self.headers.clone();
 
         if let Some(extra) = extra_headers {
+            println!("{:?}", extra);
             extra.into_iter().for_each(|(key, value)| {
                 headers.insert(key, value);
             });
         }
 
-        headers
-    }
+        println!("{:?}", headers);
 
-    pub fn get_headers_for_request(&self, mime: Option<Mime>) -> Option<HashMap<String, String>> {
-        if let Some(mimetype) = mime {
-            utils::mimetype_to_hashmap(mimetype.essence())
-        } else {
-            None
-        }
+        headers
     }
 
     pub fn handle_get(&self, request: HttpRequest) -> String {
@@ -70,15 +64,15 @@ impl HttpServer {
             .strip_prefix("/")
             .unwrap_or("")
             .to_owned();
-        let extension = filename.strip_prefix(".").unwrap_or("html");
-        println!("{}", extension);
-        let mime = Mime::from_extension(extension).to_owned();
-        let extra_headers = self.get_headers_for_request(mime);
-        println!("{:?}", extra_headers);
+        // println!("{}", extension);
+        let extension = filename.rsplit('.').next().expect("Extension not provided");
+        let mime = Mime::new(extension);
+        let extra_headers = mime.mimetype_to_hashmap();
+        // println!("{:?}", extra_headers);
         let path = Path::new("static_assets").join(filename);
         let display = path.display();
         let mut response_line = String::new();
-        let mut response_headers: Vec<String>;
+        let response_headers: Vec<String>;
         let blank_line = "\r\n";
         let mut response_body: String;
 
