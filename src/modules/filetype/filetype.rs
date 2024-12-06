@@ -1,12 +1,18 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufReader, Read};
 
-pub struct Mime {
+pub struct FileType {
+    extension: String,
+    buffer_reader: Option<Box<BufReader<File>>>,
     mime: Option<&'static str>,
 }
 
-impl Mime {
-    pub fn new(ext: &str) -> Self {
-        Mime {
+impl FileType {
+    pub fn new(ext: &str, file_path: String) -> Self {
+        FileType {
+            extension: ext.to_string(),
+            buffer_reader: Self::get_buffer_reader(file_path),
             mime: Self::get_mimetype(ext),
         }
     }
@@ -23,6 +29,25 @@ impl Mime {
             "bmp" => Some("image/bmp"),
             "csv" => Some("text/csv"),
             _ => None,
+        }
+    }
+
+    fn get_buffer_reader(file_path: String) -> Option<Box<BufReader<File>>> {
+        match File::open(file_path) {
+            Ok(file) => Some(Box::new(BufReader::new(file))),
+            Err(_) => None,
+        }
+    }
+
+    pub fn read_file(&mut self) -> Option<Vec<u8>> {
+        if let Some(reader) = self.buffer_reader.as_mut() {
+            let mut buffer = Vec::new();
+            match reader.read_to_end(&mut buffer) {
+                Ok(_) => Some(buffer),
+                Err(_) => None,
+            }
+        } else {
+            None
         }
     }
 

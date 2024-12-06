@@ -1,6 +1,7 @@
+use image::EncodableLayout;
+
+use crate::modules::filetype::FileType;
 use crate::modules::http_request::HttpRequest;
-use crate::modules::mime::Mime;
-use crate::modules::utils::utils;
 use crate::tcp_server::TcpServer;
 use crate::traits::Server;
 use std::collections::HashMap;
@@ -57,64 +58,60 @@ impl HttpServer {
         headers
     }
 
-    pub fn handle_get(&self, request: HttpRequest) -> String {
+    pub fn handle_get(&self, request: HttpRequest) -> Vec<u8> {
         let filename = request
             .uri
             .unwrap()
             .strip_prefix("/")
             .unwrap_or("")
             .to_owned();
-        // println!("{}", extension);
-        let extension = filename.rsplit('.').next().expect("Extension not provided");
-        let mime = Mime::new(extension);
-        let extra_headers = mime.mimetype_to_hashmap();
-        // println!("{:?}", extra_headers);
-        let path = Path::new("static_assets").join(filename);
-        let display = path.display();
-        let mut response_line = String::new();
-        let response_headers: Vec<String>;
-        let blank_line = "\r\n";
-        let mut response_body: String;
 
-        match File::open(path) {
-            // Err(why) => panic!("couldn't open {}: {}", display, why), TODO: Implement while logging
-            Err(why) => {
-                response_line = self.response_line(404).to_string();
-                response_headers = self
-                    .response_headers(None)
-                    .into_iter()
-                    .map(|(key, value)| format!("{}:{}", key, value))
-                    .collect();
-                response_body = "<h1>404 Not found</h1>".to_string();
-            }
-            Ok(mut file) => {
-                response_line = self.response_line(200).to_string();
-                response_headers = self
-                    .response_headers(extra_headers)
-                    .into_iter()
-                    .map(|(key, value)| format!("{}:{}", key, value))
-                    .collect();
-                let mut s = String::new();
-                match file.read_to_string(&mut s) {
-                    // Err(why) => panic!("couldn't read {}: {}", display, why), TODO: Implement while logging
-                    Err(why) => response_body = "<h1>Server could not read file</h1>".to_string(),
-                    Ok(_) => response_body = s,
-                }
+        let extension = filename.rsplit('.').next().expect("Extension not provided");
+        let file_path = format!("static_assets/{}", filename);
+
+        let mut file = FileType::new(extension, file_path);
+        let extra_headers = file.mimetype_to_hashmap();
+
+        let content = match file.read_file() {
+            Some(data) => data, // Successfully read file
+            None => {
+                // 404 Response
+                let response = format!(
+                    "{}\r\n{}\r\n{}\r\n{}",
+                    self.response_line(404),
+                    self.response_headers(None)
+                        .into_iter()
+                        .map(|(key, value)| format!("{}: {}", key, value))
+                        .collect::<Vec<String>>()
+                        .join("\r\n"),
+                    "\r\n",
+                    "<h1>Resource Not Found</h1>"
+                );
+                return response.into_bytes();
             }
         };
 
-        let response = format!(
-            "{}\r\n{}\r\n{}{}",
-            response_line,
-            response_headers.join("\r\n"),
-            blank_line,
-            response_body
-        );
+        // 200 Response
+        let response_headers = {
+            let mut headers = self
+                .response_headers(extra_headers)
+                .into_iter()
+                .map(|(key, value)| format!("{}: {}", key, value))
+                .collect::<Vec<String>>();
+            headers.push(format!("Content-Length: {}", content.len()));
+            headers.join("\r\n")
+        };
+
+        let mut response = Vec::new();
+        response.extend_from_slice(self.response_line(200).as_bytes());
+        response.extend_from_slice(response_headers.as_bytes());
+        response.extend_from_slice(b"\r\n\r\n");
+        response.extend_from_slice(&content);
 
         response
     }
 
-    pub fn http_501_handler(&self, request: HttpRequest) -> String {
+    pub fn http_501_handler(&self, request: HttpRequest) -> Vec<u8> {
         let response_line = self.response_line(501);
         let response_headers: Vec<String> = self
             .response_headers(None)
@@ -132,14 +129,14 @@ impl HttpServer {
             response_body
         );
 
-        response
+        response.as_bytes().to_vec()
     }
 }
 
 impl Server for HttpServer {
     fn handle_request(&self, data: &[u8]) -> Vec<u8> {
         let request = HttpRequest::new(data);
-        let mut response = String::new();
+        let mut response: Vec<u8> = b"foo".as_bytes().to_vec();
 
         match request.method {
             Some(ref method) => {
@@ -150,9 +147,9 @@ impl Server for HttpServer {
             _ => response = self.http_501_handler(request),
         }
 
-        print!("{}", response);
+        print!("{:?}", response);
 
-        response.as_bytes().to_vec()
+        response
 
         // let headers: Vec<String> = self
         //     .response_headers(None)
