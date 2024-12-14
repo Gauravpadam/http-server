@@ -1,6 +1,7 @@
 use image::EncodableLayout;
 
 use crate::modules::filetype::FileType;
+use crate::modules::http_request::HttpMethod;
 use crate::modules::http_request::HttpRequest;
 use crate::tcp_server::TcpServer;
 use crate::traits::Server;
@@ -58,6 +59,17 @@ impl HttpServer {
         headers
     }
 
+    // POST /test HTTP/1.1
+    // Host: example.com
+    // Content-Type: application/x-www-form-urlencoded
+    // Content-Length: 27
+    // field1=value1&field2=value2
+
+    // pub fn handle_post(&self, request: HttpRequest) {
+    //     let path = Path::new("database/seeqwel.txt");
+    //     let file = File::open(path).expect("Could not open file");
+    // }
+
     pub fn handle_get(&self, request: HttpRequest) -> Vec<u8> {
         let filename = request
             .uri
@@ -111,6 +123,29 @@ impl HttpServer {
         response
     }
 
+    // fn interpret_request_headers()
+
+    fn handle_post(&self, request: HttpRequest) -> Vec<u8> {
+        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
+            .as_bytes()
+            .to_vec()
+    }
+    fn handle_patch(&self, request: HttpRequest) -> Vec<u8> {
+        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
+            .as_bytes()
+            .to_vec()
+    }
+    fn handle_put(&self, request: HttpRequest) -> Vec<u8> {
+        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
+            .as_bytes()
+            .to_vec()
+    }
+    fn handle_delete(&self, request: HttpRequest) -> Vec<u8> {
+        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
+            .as_bytes()
+            .to_vec()
+    }
+
     pub fn http_501_handler(&self, request: HttpRequest) -> Vec<u8> {
         let response_line = self.response_line(501);
         let response_headers: Vec<String> = self
@@ -136,16 +171,15 @@ impl HttpServer {
 impl Server for HttpServer {
     fn handle_request(&self, data: &[u8]) -> Vec<u8> {
         let request = HttpRequest::new(data);
-        let mut response: Vec<u8> = b"foo".as_bytes().to_vec();
 
-        match request.method {
-            Some(ref method) => {
-                if method == "GET" {
-                    response = self.handle_get(request);
-                }
-            }
-            _ => response = self.http_501_handler(request),
-        }
+        let response = match request.method {
+            HttpMethod::GET => self.handle_get(request),
+            HttpMethod::POST => self.handle_post(request),
+            HttpMethod::PATCH => self.handle_patch(request),
+            HttpMethod::PUT => self.handle_put(request),
+            HttpMethod::DELETE => self.handle_delete(request),
+            _ => self.http_501_handler(request),
+        };
 
         print!("{:?}", response);
 
