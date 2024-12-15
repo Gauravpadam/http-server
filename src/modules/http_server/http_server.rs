@@ -33,10 +33,12 @@ impl HttpServer {
     }
 
     fn response_line(&self, status_code: i32) -> &str {
+        // TODO: Make this an enum.
         match status_code {
             200 => "HTTP/1.1 200 OK",
             404 => "HTTP/1.1 404 Not Found",
             501 => "HTTP/1.1 501 Not implemented",
+            403 => "HTTP/1.1 403 Forbidden",
             _ => "HTTP/1.1 500 Internal Server Error", // Add a fallback for unexpected codes.
         }
     }
@@ -126,9 +128,57 @@ impl HttpServer {
     // fn interpret_request_headers()
 
     fn handle_post(&self, request: HttpRequest) -> Vec<u8> {
-        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
-            .as_bytes()
-            .to_vec()
+        let filename = request
+            .uri
+            .unwrap()
+            .strip_prefix("/")
+            .unwrap_or("")
+            .to_owned();
+
+        // let extension = filename.rsplit('.').next().unwrap_or("txt");
+        let file_path = format!("database/{}", filename);
+        let extra_headers = None; // Might change this later
+        let response_line: &[u8];
+        let response_body: &[u8];
+        let path = Path::new(&file_path);
+        let display = path.display();
+
+        if path.is_file() {
+            response_line = self.response_line(403).as_bytes();
+            response_body =
+                "{'message': 'Forbidden creation request for an existing resource'}".as_bytes();
+        } else {
+            response_line = self.response_line(200).as_bytes();
+            let mut file = match File::create(path) {
+                Err(why) => panic!("Something went wrong while creating the file: {}", why),
+                Ok(file) => file,
+            };
+
+            match file.write_all(request.request_body.as_bytes()) {
+                Err(why) => panic!("Failed to write to resource: {}", why),
+                Ok(_) => {
+                    println!("successfully wrote to {}", display);
+                }
+            }
+            response_body = "{'message': 'Resource created successfully'}".as_bytes();
+        }
+        let response_headers = {
+            let mut headers = self
+                .response_headers(extra_headers)
+                .into_iter()
+                .map(|(key, value)| format!("{}: {}", key, value))
+                .collect::<Vec<String>>();
+            headers.push(format!("Content-Length: {}", response_body.len()));
+            headers.join("\r\n")
+        };
+
+        let mut response = Vec::new();
+        response.extend_from_slice(response_line);
+        response.extend_from_slice(response_headers.as_bytes());
+        response.extend_from_slice(b"\r\n\r\n");
+        response.extend_from_slice(&response_body);
+
+        response
     }
     fn handle_patch(&self, request: HttpRequest) -> Vec<u8> {
         "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
