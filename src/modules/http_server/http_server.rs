@@ -10,6 +10,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 use std::{
+    fs,
     io::{Read, Write},
     net::TcpStream,
 };
@@ -191,9 +192,53 @@ impl HttpServer {
             .to_vec()
     }
     fn handle_delete(&self, request: HttpRequest) -> Vec<u8> {
-        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
-            .as_bytes()
-            .to_vec()
+        let filename = request
+            .uri
+            .unwrap()
+            .strip_prefix("/")
+            .unwrap_or("")
+            .to_owned();
+
+        // let extension = filename.rsplit('.').next().unwrap_or("txt");
+        let file_path = format!("database/{}", filename);
+        let extra_headers = None; // Might change this later
+        let response_line: &[u8];
+        let response_body: &[u8];
+        let mut response_headers: Vec<String>;
+        let path = Path::new(&file_path);
+
+        match fs::remove_file(path) {
+            Err(why) => {
+                response_line = self.response_line(404).as_bytes();
+                response_body = "{'message': '404 file not found!'}".as_bytes();
+                response_headers = self
+                    .response_headers(extra_headers)
+                    .into_iter()
+                    .map(|(key, value)| format!("{}: {}", key, value))
+                    .collect::<Vec<String>>();
+                response_headers.push(format!("Content-Length: {}", response_body.len()));
+                panic!("Failed to delete resource: {}", why)
+            }
+            Ok(_) => {
+                response_line = self.response_line(200).as_bytes();
+                response_body = "{'message': 'Resource deletion successful!'}".as_bytes();
+                response_headers = self
+                    .response_headers(extra_headers)
+                    .into_iter()
+                    .map(|(k, v)| format!("{}:{}", k, v))
+                    .collect::<Vec<String>>();
+                response_headers.push(format!("Content-Length: {}", response_body.len()));
+                println!("successfully Deleted {}", filename);
+            }
+        }
+
+        let mut response = Vec::new();
+        response.extend_from_slice(response_line);
+        response.extend_from_slice(response_headers.join("\r\n").as_bytes());
+        response.extend_from_slice(b"\r\n\r\n");
+        response.extend_from_slice(&response_body);
+
+        response
     }
 
     pub fn http_501_handler(&self, request: HttpRequest) -> Vec<u8> {
