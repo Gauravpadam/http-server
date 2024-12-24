@@ -1,8 +1,10 @@
-use image::EncodableLayout;
+use serde_json::Map;
+use serde_json::Value;
 
 use crate::modules::filetype::FileType;
 use crate::modules::http_request::HttpMethod;
 use crate::modules::http_request::HttpRequest;
+use crate::modules::schemas::Schwema;
 use crate::tcp_server::TcpServer;
 use crate::traits::Server;
 use std::collections::HashMap;
@@ -72,6 +74,9 @@ impl HttpServer {
     //     let path = Path::new("database/seeqwel.txt");
     //     let file = File::open(path).expect("Could not open file");
     // }
+    //
+
+    // Refactor the match code to be a separate function
 
     pub fn handle_get(&self, request: HttpRequest) -> Vec<u8> {
         let filename = request
@@ -186,11 +191,72 @@ impl HttpServer {
             .as_bytes()
             .to_vec()
     }
+
+    // Edits existing reesources and creates new ones if they don't exist.
+    // TODO:
+    // Use the schwema to make edit easier, right now you aren't editing a schema viz. not the correct approach. Fix that.
+    // Fix the headers; Add more to them: Content location, Content type.
     fn handle_put(&self, request: HttpRequest) -> Vec<u8> {
-        "HTTP/1.1 200 WIP\r\nContent-Type: application/json\r\nContent-Length: 132\r\nLocation: https://api.example.com/resource/12345\r\nDate: Sat, 16 Dec 2024 00:00:00 GMT\r\nConnection: keep-alive\r\n\r\nsay=hi&to=mom"
-            .as_bytes()
-            .to_vec()
+        // Extract the filename from the URI
+        let filename = request
+            .uri
+            .unwrap()
+            .strip_prefix("/")
+            .unwrap_or("")
+            .to_owned();
+        let file_path = format!("database/{}", filename);
+        let path = Path::new(&file_path);
+
+        // Initialize content as an empty JSON object
+        let mut content: Value = Value::Object(Map::new());
+
+        // Parse the request body into a JSON value
+        let parsed_request_body: Value =
+            serde_json::from_str(request.request_body.as_str()).expect("Failed to parse JSON");
+
+        // Check if the file exists
+        if path.is_file() {
+            // Read the file's content and parse it as JSON
+            let file_content = fs::read_to_string(path).expect("Failed to read file");
+            content = serde_json::from_str(&file_content).expect("Failed to parse existing JSON");
+        }
+
+        // Merge the parsed request body into the content
+        if let Some(obj) = parsed_request_body.as_object() {
+            if let Some(existing_obj) = content.as_object_mut() {
+                for (key, value) in obj.iter() {
+                    existing_obj.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        // Write the updated JSON content back to the file
+        let mut file = File::create(path).expect("Failed to create or overwrite the file");
+        let updated_content =
+            serde_json::to_string_pretty(&content).expect("Failed to serialize JSON");
+        file.write_all(updated_content.as_bytes())
+            .expect("Failed to write to file");
+
+        // Prepare and send the response
+        let response_line = self.response_line(200).as_bytes();
+        let response_body = "{'message': 'Resource updated successfully'}".as_bytes();
+        let response_headers = self
+            .response_headers(None)
+            .into_iter()
+            .map(|(key, value)| format!("{}:{}", key, value).to_string())
+            .collect::<Vec<String>>()
+            .join("\r\n");
+        let response = [
+            response_line,
+            response_headers.as_bytes(),
+            "\r\n\r\n".as_bytes(),
+            response_body,
+        ]
+        .concat();
+
+        response
     }
+
     fn handle_delete(&self, request: HttpRequest) -> Vec<u8> {
         let filename = request
             .uri
